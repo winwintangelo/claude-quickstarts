@@ -15,8 +15,8 @@ __ALL__ = [
     EditTool20250124,
     EditTool20250429,
     EditTool20250728,
+    TOOL_GROUPS_BY_VERSION,
     ToolCollection,
     ToolResult,
     ToolVersion,
-    TOOL_GROUPS_BY_VERSION,
 ]
