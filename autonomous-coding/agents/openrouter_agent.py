@@ -312,6 +312,47 @@ class OpenRouterAgent(BaseCodingAgent):
         if not config.allowed_commands:
             config.allowed_commands = DEFAULT_ALLOWED_COMMANDS.copy()
 
+    async def _detect_server_port(self, pid: int) -> Optional[int]:
+        """
+        Detect which port a server process is listening on using lsof.
+        
+        Args:
+            pid: Process ID to check
+            
+        Returns:
+            Port number if detected, None otherwise
+        """
+        try:
+            await asyncio.sleep(1)  # Wait for port to bind
+            
+            # Use lsof to find listening ports
+            process = await asyncio.create_subprocess_shell(
+                f"lsof -i -P -n | grep {pid} | grep LISTEN",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=5)
+            output = stdout.decode()
+            
+            import re
+            match = re.search(r':(\d+)\s+\(LISTEN\)', output)
+            if match:
+                return int(match.group(1))
+            
+            # Fallback: check common dev ports
+            for port in [5173, 3000, 8080, 4000]:
+                check = await asyncio.create_subprocess_shell(
+                    f"lsof -i :{port} | grep LISTEN",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _ = await asyncio.wait_for(check.communicate(), timeout=2)
+                if stdout.decode().strip():
+                    return port
+        except Exception:
+            pass
+        return None
+
     @property
     def name(self) -> str:
         return "OpenRouter"
@@ -558,10 +599,15 @@ class OpenRouterAgent(BaseCodingAgent):
                     if process.returncode is None:
                         self._server_process = process
                         self._server_command = command
+                        
+                        # Detect which port the server is listening on
+                        detected_port = await self._detect_server_port(process.pid)
+                        port_info = f"\n🌐 Detected URL: http://localhost:{detected_port}" if detected_port else ""
+                        
                         return (
                             f"Server started successfully!\n"
                             f"Command: {command}\n"
-                            f"PID: {process.pid}\n"
+                            f"PID: {process.pid}{port_info}\n"
                             "Server is running in background."
                         )
                     else:
@@ -672,11 +718,16 @@ class OpenRouterAgent(BaseCodingAgent):
                     return "Error: 'selector' parameter is required"
                 
                 try:
-                    await self._page.click(selector, timeout=10000)
-                    await self._page.wait_for_load_state("networkidle", timeout=5000)
+                    # Reduced timeout from 10s to 3s for faster feedback
+                    await self._page.click(selector, timeout=3000)
+                    await self._page.wait_for_load_state("networkidle", timeout=3000)
                     return f"Clicked element: {selector}"
                 except Exception as e:
-                    return f"Error clicking element '{selector}': {str(e)}"
+                    # Provide helpful fallback suggestions
+                    error_msg = f"Error clicking '{selector}': {str(e)}"
+                    error_msg += "\nTip: Try using browser_evaluate to click via JavaScript:"
+                    error_msg += "\n  browser_evaluate({\"script\": \"document.querySelector('...').click()\"})"
+                    return error_msg
 
             elif tool_name == "browser_fill":
                 if self._page is None:
@@ -691,10 +742,13 @@ class OpenRouterAgent(BaseCodingAgent):
                     return "Error: 'text' parameter is required"
                 
                 try:
-                    await self._page.fill(selector, text, timeout=10000)
+                    # Reduced timeout from 10s to 3s
+                    await self._page.fill(selector, text, timeout=3000)
                     return f"Filled '{selector}' with text: {text[:50]}{'...' if len(text) > 50 else ''}"
                 except Exception as e:
-                    return f"Error filling element '{selector}': {str(e)}"
+                    error_msg = f"Error filling '{selector}': {str(e)}"
+                    error_msg += "\nTip: Try using browser_evaluate to fill via JavaScript"
+                    return error_msg
 
             elif tool_name == "browser_evaluate":
                 if self._page is None:
@@ -906,11 +960,20 @@ IMPORTANT:
         response_text = ""
         tool_calls_made = []
         max_iterations = 100  # Allow enough iterations for full feature cycle
+        total_thinking_ms = 0  # Track cumulative thinking time
 
         try:
             for iteration in range(max_iterations):
-                # Call API
+                # Call API with thinking time tracking
+                thinking_start = time.perf_counter()
                 result = await self._call_api(self._messages)
+                thinking_end = time.perf_counter()
+                thinking_ms = (thinking_end - thinking_start) * 1000
+                total_thinking_ms += thinking_ms
+                
+                # Log thinking duration for significant waits
+                if thinking_ms > 1000:
+                    log(f"\n[Thinking: {thinking_ms/1000:.1f}s]", flush=True)
 
                 choice = result.get("choices", [{}])[0]
                 message = choice.get("message", {})
@@ -1045,7 +1108,7 @@ IMPORTANT:
             total_duration_ms = sum(tc.get("duration_ms", 0) for tc in tool_calls_made)
             
             if tool_calls_made:
-                log(f"[Summary] {len(tool_calls_made)} tool calls, total execution time: {total_duration_ms:.0f}ms")
+                log(f"[Summary] {len(tool_calls_made)} tool calls, tool execution: {total_duration_ms:.0f}ms, thinking: {total_thinking_ms/1000:.1f}s")
             
             if write_calls == 0 and len(tool_calls_made) > 10:
                 log(f"[Note] Made {len(tool_calls_made)} tool calls but no files were written.")
