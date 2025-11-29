@@ -1,1 +1,18 @@
+# Core dependencies
 claude-code-sdk>=0.0.25
+httpx>=0.27.0  # For OpenRouter API calls
+python-dotenv>=1.0.0  # For .env file support
+playwright>=1.40.0  # Browser automation for OpenRouter agent
+
+# Note: OpenAI Codex CLI is installed separately via npm:
+#   npm install -g @openai/codex
+#
+# For Codex agent, you also need:
+#   export OPENAI_API_KEY='your-api-key-here'
+#
+# For OpenRouter agent:
+#   export OPENROUTER_API_KEY='your-api-key-here'
+#   Get your key from: https://openrouter.ai/keys
+#
+# After installing playwright, run:
+#   playwright install chromium

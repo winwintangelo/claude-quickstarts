@@ -163,15 +163,82 @@ Before context fills up:
 
 **ALL testing must use browser automation tools.**
 
-Available tools:
-- puppeteer_navigate - Start browser and go to URL
-- puppeteer_screenshot - Capture screenshot
-- puppeteer_click - Click elements
-- puppeteer_fill - Fill form inputs
-- puppeteer_evaluate - Execute JavaScript (use sparingly, only for debugging)
-
 Test like a human user with mouse and keyboard. Don't take shortcuts by using JavaScript evaluation.
-Don't use the puppeteer "active tab" tool.
+
+---
+
+## BROWSER AUTOMATION TOOLS
+
+You have access to browser automation for UI testing. The tools vary by agent:
+
+### For Claude Agent (Puppeteer MCP)
+
+| Tool | Description | Example |
+|------|-------------|---------|
+| `puppeteer_navigate` | Navigate to URL | `puppeteer_navigate("http://localhost:3000")` |
+| `puppeteer_screenshot` | Capture screenshot | `puppeteer_screenshot()` |
+| `puppeteer_click` | Click element by selector | `puppeteer_click("button.submit")` |
+| `puppeteer_fill` | Fill input field | `puppeteer_fill("input[name=email]", "user@test.com")` |
+| `puppeteer_evaluate` | Run JS (use sparingly) | `puppeteer_evaluate("document.title")` |
+
+### For OpenRouter Agent (Playwright)
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `browser_navigate` | `url` (required) | Navigate to URL, auto-launches browser |
+| `browser_screenshot` | `full_page`, `selector` (optional) | Capture screenshot |
+| `browser_click` | `selector` (required) | Click element by CSS selector |
+| `browser_fill` | `selector`, `text` (required) | Fill input field |
+| `browser_evaluate` | `script` (required) | Execute JavaScript in browser |
+| `browser_close` | none | Close browser when done |
+
+**Examples (OpenRouter):**
+```json
+// Navigate to app
+{"tool": "browser_navigate", "url": "http://localhost:3000"}
+
+// Take screenshot
+{"tool": "browser_screenshot", "full_page": true}
+
+// Click a button
+{"tool": "browser_click", "selector": "button.submit"}
+
+// Fill form field
+{"tool": "browser_fill", "selector": "#email", "text": "test@example.com"}
+
+// Check page title
+{"tool": "browser_evaluate", "script": "document.title"}
+
+// Close browser when done
+{"tool": "browser_close"}
+```
+
+**Best Practices:**
+- Always start by navigating to the app URL
+- Take screenshots at each major step for verification
+- Use CSS selectors (e.g., `#id`, `.class`, `button[type=submit]`)
+- Close browser when done testing to free resources
+- Don't rely solely on `browser_evaluate` - test through actual UI clicks
+
+---
+
+## ALLOWED BASH COMMANDS
+
+You can ONLY use these bash commands (all others will be blocked):
+
+| Category | Commands |
+|----------|----------|
+| **File inspection** | `ls`, `cat`, `head`, `tail`, `wc`, `grep`, `find` (current dir only) |
+| **File operations** | `cp`, `mkdir`, `chmod` (+x only) |
+| **Directory** | `pwd` |
+| **Node.js** | `npm`, `node` |
+| **Version control** | `git` |
+| **Process management** | `ps`, `lsof`, `sleep`, `pkill` (node/npm/vite/next only) |
+| **Scripts** | `./init.sh` |
+
+**NOT ALLOWED:** `rm`, `mv`, `touch`, `echo`, `curl`, `wget`, `python`, `bash`, `sh`, `kill`, `sudo`, etc.
+
+**For file read/write operations, prefer using the SDK tools (Read, Write, Edit) over bash commands.**
 
 ---
 

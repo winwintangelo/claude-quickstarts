@@ -1,10 +1,12 @@
 # Autonomous Coding Agent Demo
 
-A minimal harness demonstrating long-running autonomous coding with the Claude Agent SDK. This demo implements a two-agent pattern (initializer + coding agent) that can build complete applications over multiple sessions.
+A minimal harness demonstrating long-running autonomous coding with AI coding agents. This demo implements a two-agent pattern (initializer + coding agent) that can build complete applications over multiple sessions.
+
+**Supports multiple agents:** Claude Code SDK and OpenAI Codex CLI.
 
 ## Prerequisites
 
-**Required:** Install the latest versions of both Claude Code and the Claude Agent SDK:
+### For Claude Agent (default)
 
 ```bash
 # Install Claude Code CLI (latest version required)
@@ -12,28 +14,67 @@ npm install -g @anthropic-ai/claude-code
 
 # Install Python dependencies
 pip install -r requirements.txt
-```
 
-Verify your installations:
-```bash
-claude --version  # Should be latest version
-pip show claude-code-sdk  # Check SDK is installed
-```
-
-**API Key:** Set your Anthropic API key:
-```bash
+# Set API key (choose one method):
+# Option 1: Environment variable
 export ANTHROPIC_API_KEY='your-api-key-here'
+
+# Option 2: Create .env file
+cp env.example .env
+# Then edit .env and add your API keys
+```
+
+### For OpenAI Codex Agent
+
+```bash
+# Install Codex CLI
+npm install -g @openai/codex
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Authenticate (choose one):
+# Option 1: Login with ChatGPT account (recommended)
+codex login
+
+# Option 2: Use API key
+export OPENAI_API_KEY='your-api-key-here'
 ```
 
 ## Quick Start
 
+### Using Claude (default)
 ```bash
 python autonomous_agent_demo.py --project-dir ./my_project
 ```
 
-For testing with limited iterations:
+### Using OpenAI Codex
+```bash
+python autonomous_agent_demo.py --project-dir ./my_project --agent codex
+```
+
+### Using OpenRouter (100+ models)
+```bash
+export OPENROUTER_API_KEY='your-key-here'
+python autonomous_agent_demo.py --project-dir ./my_project --agent openrouter
+python autonomous_agent_demo.py --project-dir ./my_project --agent openrouter --model openai/gpt-4o
+```
+
+### For testing with limited iterations:
 ```bash
 python autonomous_agent_demo.py --project-dir ./my_project --max-iterations 3
+```
+
+### List available agents:
+```bash
+python autonomous_agent_demo.py --list-agents
+```
+
+### Validate your setup:
+```bash
+python validate_agent.py          # Check all agents
+python validate_agent.py claude   # Check Claude only
+python validate_agent.py codex    # Check Codex only
 ```
 
 ## Important Timing Expectations
@@ -63,9 +104,17 @@ python autonomous_agent_demo.py --project-dir ./my_project --max-iterations 3
 - The agent auto-continues between sessions (3 second delay)
 - Press `Ctrl+C` to pause; run the same command to resume
 
+## Supported Agents
+
+| Agent | Provider | SDK/CLI | Default Model | Auth |
+|-------|----------|---------|---------------|------|
+| `claude` | Anthropic | claude-code-sdk | claude-sonnet-4-5-20250929 | `ANTHROPIC_API_KEY` env var |
+| `codex` | OpenAI | @openai/codex | gpt-5.1-codex-max | `codex login` OR `OPENAI_API_KEY` env var |
+| `openrouter` | OpenRouter | REST API | anthropic/claude-sonnet-4 | `OPENROUTER_API_KEY` env var |
+
 ## Security Model
 
-This demo uses a defense-in-depth security approach (see `security.py` and `client.py`):
+This demo uses a defense-in-depth security approach (see `security.py`):
 
 1. **OS-level Sandbox:** Bash commands run in an isolated environment
 2. **Filesystem Restrictions:** File operations restricted to the project directory only
@@ -83,15 +132,23 @@ Commands not in the allowlist are blocked by the security hook.
 autonomous-coding/
 ├── autonomous_agent_demo.py  # Main entry point
 ├── agent.py                  # Agent session logic
-├── client.py                 # Claude SDK client configuration
+├── agents/                   # Multi-agent abstraction layer
+│   ├── __init__.py           # Agent factory and registry
+│   ├── base.py               # BaseCodingAgent abstract class
+│   ├── claude_agent.py       # Claude Code SDK implementation
+│   ├── codex_agent.py        # OpenAI Codex CLI implementation
+│   └── openrouter_agent.py   # OpenRouter API implementation
+├── client.py                 # Claude SDK client configuration (legacy)
 ├── security.py               # Bash command allowlist and validation
 ├── progress.py               # Progress tracking utilities
 ├── prompts.py                # Prompt loading utilities
+├── validate_agent.py         # Agent setup validation script
 ├── prompts/
 │   ├── app_spec.txt          # Application specification
 │   ├── initializer_prompt.md # First session prompt
 │   └── coding_prompt.md      # Continuation session prompt
-└── requirements.txt          # Python dependencies
+├── requirements.txt          # Python dependencies
+└── PRD.md                    # Product requirements document
 ```
 
 ## Generated Project Structure
@@ -104,7 +161,8 @@ my_project/
 ├── app_spec.txt              # Copied specification
 ├── init.sh                   # Environment setup script
 ├── claude-progress.txt       # Session progress notes
-├── .claude_settings.json     # Security settings
+├── .claude_settings.json     # Security settings (Claude)
+├── .codex_config.json        # Config settings (Codex)
 └── [application files]       # Generated application code
 ```
 
@@ -130,8 +188,10 @@ The application will typically be available at `http://localhost:3000` or simila
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--project-dir` | Directory for the project | `./autonomous_demo_project` |
+| `--agent` | Coding agent to use (`claude` or `codex`) | `claude` |
 | `--max-iterations` | Max agent iterations | Unlimited |
-| `--model` | Claude model to use | `claude-sonnet-4-5-20250929` |
+| `--model` | Model to use | Agent's default |
+| `--list-agents` | List available agents and exit | - |
 
 ## Customization
 
@@ -147,6 +207,12 @@ Edit `prompts/initializer_prompt.md` and change the "200 features" requirement t
 
 Edit `security.py` to add or remove commands from `ALLOWED_COMMANDS`.
 
+### Adding New Agents
+
+1. Create a new file in `agents/` (e.g., `my_agent.py`)
+2. Implement `BaseCodingAgent` interface
+3. Register in `agents/__init__.py` `AGENT_REGISTRY`
+
 ## Troubleshooting
 
 **"Appears to hang on first run"**
@@ -156,7 +222,12 @@ This is normal. The initializer agent is generating 200 detailed test cases, whi
 The agent tried to run a command not in the allowlist. This is the security system working as intended. If needed, add the command to `ALLOWED_COMMANDS` in `security.py`.
 
 **"API key not set"**
-Ensure `ANTHROPIC_API_KEY` is exported in your shell environment.
+Ensure the appropriate API key is exported in your shell environment:
+- Claude: `export ANTHROPIC_API_KEY='your-key'`
+- Codex: `export OPENAI_API_KEY='your-key'`
+
+**"Codex CLI not found"**
+Install the Codex CLI: `npm install -g @openai/codex`
 
 ## License
 

@@ -8,6 +8,8 @@ Functions for tracking and displaying progress of the autonomous coding agent.
 import json
 from pathlib import Path
 
+from logging_util import log
+
 
 def count_passing_tests(project_dir: Path) -> tuple[int, int]:
     """
@@ -40,10 +42,10 @@ def print_session_header(session_num: int, is_initializer: bool) -> None:
     """Print a formatted header for the session."""
     session_type = "INITIALIZER" if is_initializer else "CODING AGENT"
 
-    print("\n" + "=" * 70)
-    print(f"  SESSION {session_num}: {session_type}")
-    print("=" * 70)
-    print()
+    log("\n" + "=" * 70)
+    log(f"  SESSION {session_num}: {session_type}")
+    log("=" * 70)
+    log("")
 
 
 def print_progress_summary(project_dir: Path) -> None:
@@ -52,6 +54,6 @@ def print_progress_summary(project_dir: Path) -> None:
 
     if total > 0:
         percentage = (passing / total) * 100
-        print(f"\nProgress: {passing}/{total} tests passing ({percentage:.1f}%)")
+        log(f"\nProgress: {passing}/{total} tests passing ({percentage:.1f}%)")
     else:
-        print("\nProgress: feature_list.json not yet created")
+        log("\nProgress: feature_list.json not yet created")

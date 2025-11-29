@@ -102,5 +102,37 @@ The next agent will continue from here with a fresh context window.
 
 ---
 
+## ALLOWED BASH COMMANDS
+
+You can ONLY use these bash commands (all others will be blocked):
+
+| Category | Commands |
+|----------|----------|
+| **File inspection** | `ls`, `cat`, `head`, `tail`, `wc`, `grep`, `find` (current dir only) |
+| **File operations** | `cp`, `mkdir`, `chmod` (+x only) |
+| **Directory** | `pwd` |
+| **Node.js** | `npm`, `node` |
+| **Version control** | `git` |
+| **Process management** | `ps`, `lsof`, `sleep`, `pkill` (node/npm/vite/next only) |
+| **Scripts** | `./init.sh` |
+
+**NOT ALLOWED:** `rm`, `mv`, `touch`, `echo`, `curl`, `wget`, `python`, `bash`, `sh`, `kill`, `sudo`, etc.
+
+**For file read/write operations, prefer using the SDK tools (Read, Write, Edit) over bash commands.**
+
+---
+
+## BROWSER AUTOMATION (Optional for Verification)
+
+If you start implementation and need to verify, you have browser automation tools available:
+
+**Claude Agent:** `puppeteer_navigate`, `puppeteer_screenshot`, `puppeteer_click`, `puppeteer_fill`
+
+**OpenRouter Agent:** `browser_navigate`, `browser_screenshot`, `browser_click`, `browser_fill`, `browser_close`
+
+Use these to verify any features you implement actually work in the browser.
+
+---
+
 **Remember:** You have unlimited time across many sessions. Focus on
 quality over speed. Production-ready is the goal.

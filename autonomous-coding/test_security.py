@@ -14,6 +14,7 @@ from security import (
     bash_security_hook,
     extract_commands,
     validate_chmod_command,
+    validate_find_command,
     validate_init_script,
 )
 
@@ -151,6 +152,70 @@ def test_validate_init_script():
     return passed, failed
 
 
+def test_validate_find():
+    """Test find command validation."""
+    print("\nTesting find validation:\n")
+    passed = 0
+    failed = 0
+
+    # Test cases: (command, should_be_allowed, description)
+    test_cases = [
+        # Allowed cases - safe file discovery
+        ("find .", True, "current directory"),
+        ("find ./", True, "current directory with slash"),
+        ("find ./src", True, "subdirectory"),
+        ("find ./src/components", True, "nested subdirectory"),
+        ("find . -name '*.js'", True, "find by name"),
+        ("find . -name '*.ts' -type f", True, "find files by name and type"),
+        ("find ./src -name '*.tsx'", True, "find in subdir by name"),
+        ("find . -type d", True, "find directories"),
+        ("find . -type f", True, "find files"),
+        ("find . -maxdepth 2", True, "with maxdepth"),
+        ("find . -maxdepth 3 -name '*.js'", True, "maxdepth with name"),
+        ("find . -mtime -7", True, "modified in last 7 days"),
+        ("find . -size +1M", True, "files larger than 1M"),
+        ("find . -name '*.log' -type f", True, "combined options"),
+        # Blocked cases - dangerous options
+        ("find . -exec rm {} \\;", False, "-exec is dangerous"),
+        ("find . -exec cat {} \\;", False, "-exec even with cat"),
+        ("find . -execdir rm {} \\;", False, "-execdir is dangerous"),
+        ("find . -delete", False, "-delete is dangerous"),
+        ("find . -ok rm {} \\;", False, "-ok is dangerous"),
+        ("find . -okdir rm {} \\;", False, "-okdir is dangerous"),
+        ("find . -name '*.tmp' -exec rm {} +", False, "-exec with + terminator"),
+        ("find . -type f -exec sh -c 'cat {}' \\;", False, "-exec with shell"),
+        # Blocked cases - path traversal
+        ("find /", False, "root directory"),
+        ("find /etc", False, "absolute path /etc"),
+        ("find /home", False, "absolute path /home"),
+        ("find /tmp", False, "absolute path /tmp"),
+        ("find ..", False, "parent directory"),
+        ("find ../", False, "parent directory with slash"),
+        ("find ../../", False, "grandparent directory"),
+        ("find ./..", False, "hidden parent traversal"),
+        ("find ./src/../..", False, "traversal in path"),
+        ("find src", False, "relative without ./"),
+        # Edge cases
+        ("find", False, "no path argument"),
+    ]
+
+    for cmd, should_allow, description in test_cases:
+        allowed, reason = validate_find_command(cmd)
+        if allowed == should_allow:
+            print(f"  PASS: {cmd!r} ({description})")
+            passed += 1
+        else:
+            expected = "allowed" if should_allow else "blocked"
+            actual = "allowed" if allowed else "blocked"
+            print(f"  FAIL: {cmd!r} ({description})")
+            print(f"         Expected: {expected}, Got: {actual}")
+            if reason:
+                print(f"         Reason: {reason}")
+            failed += 1
+
+    return passed, failed
+
+
 def main():
     print("=" * 70)
     print("  SECURITY HOOK TESTS")
@@ -173,6 +238,11 @@ def main():
     init_passed, init_failed = test_validate_init_script()
     passed += init_passed
     failed += init_failed
+
+    # Test find validation
+    find_passed, find_failed = test_validate_find()
+    passed += find_passed
+    failed += find_failed
 
     # Commands that SHOULD be blocked
     print("\nCommands that should be BLOCKED:\n")
@@ -207,6 +277,15 @@ def main():
         "./setup.sh",
         "./malicious.sh",
         "bash script.sh",
+        # find with dangerous options
+        "find . -exec rm {} \\;",
+        "find . -delete",
+        "find . -execdir cat {} \\;",
+        # find with path traversal
+        "find /",
+        "find /etc",
+        "find ..",
+        "find ../../",
     ]
 
     for cmd in dangerous:
@@ -234,6 +313,10 @@ def main():
         # Node.js development
         "npm install",
         "npm run build",
+        "npm create vite@latest . -- --template react-ts",
+        "npx tailwindcss init -p",
+        "npx vite",
+        "npx vite build",
         "node server.js",
         # Version control
         "git status",
@@ -265,6 +348,14 @@ def main():
         "/path/to/init.sh",
         # Combined chmod and init.sh
         "chmod +x init.sh && ./init.sh",
+        # find with safe options (current directory only)
+        "find .",
+        "find ./",
+        "find ./src",
+        "find . -name '*.js'",
+        "find . -type f -name '*.ts'",
+        "find ./src -maxdepth 2 -name '*.tsx'",
+        "find . -mtime -7",
     ]
 
     for cmd in safe:

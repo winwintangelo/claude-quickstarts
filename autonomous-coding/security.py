@@ -20,6 +20,7 @@ ALLOWED_COMMANDS = {
     "tail",
     "wc",
     "grep",
+    "find",  # For file discovery; validated separately
     # File operations (agent uses SDK tools for most file ops, but cp/mkdir needed occasionally)
     "cp",
     "mkdir",
@@ -28,6 +29,7 @@ ALLOWED_COMMANDS = {
     "pwd",
     # Node.js development
     "npm",
+    "npx",  # For running package binaries (e.g., npx tailwindcss init, npx vite)
     "node",
     # Version control
     "git",
@@ -41,7 +43,7 @@ ALLOWED_COMMANDS = {
 }
 
 # Commands that need additional validation even when in the allowlist
-COMMANDS_NEEDING_EXTRA_VALIDATION = {"pkill", "chmod", "init.sh"}
+COMMANDS_NEEDING_EXTRA_VALIDATION = {"pkill", "chmod", "init.sh", "find"}
 
 
 def split_command_segments(command_string: str) -> list[str]:
@@ -276,6 +278,90 @@ def validate_init_script(command_string: str) -> tuple[bool, str]:
     return False, f"Only ./init.sh is allowed, got: {script}"
 
 
+def validate_find_command(command_string: str) -> tuple[bool, str]:
+    """
+    Validate find commands - only allow safe file discovery within current directory.
+
+    Security restrictions:
+    1. Path must start with '.' (current directory only)
+    2. Block dangerous options: -exec, -execdir, -delete, -ok
+    3. Allow safe options: -name, -type, -maxdepth, -size, -mtime, etc.
+
+    Returns:
+        Tuple of (is_allowed, reason_if_blocked)
+    """
+    # Dangerous options that allow command execution or file deletion
+    DANGEROUS_OPTIONS = {
+        "-exec",
+        "-execdir",
+        "-delete",
+        "-ok",
+        "-okdir",
+    }
+
+    try:
+        tokens = shlex.split(command_string)
+    except ValueError:
+        return False, "Could not parse find command"
+
+    if not tokens or tokens[0] != "find":
+        return False, "Not a find command"
+
+    if len(tokens) < 2:
+        return False, "find requires a path argument"
+
+    # Get the path argument (first non-option argument after 'find')
+    path = None
+    i = 1
+    while i < len(tokens):
+        token = tokens[i]
+        # Skip if it's an option (starts with -)
+        if token.startswith("-"):
+            # Check for dangerous options
+            option = token.split("=")[0]  # Handle -option=value format
+            if option in DANGEROUS_OPTIONS:
+                return False, f"find option '{option}' is not allowed (security risk)"
+            
+            # Some options take a value, skip the next token
+            # Options that take values: -name, -iname, -type, -maxdepth, -mindepth, -size, -mtime, etc.
+            if option in {
+                "-name", "-iname", "-path", "-ipath", "-regex", "-iregex",
+                "-type", "-maxdepth", "-mindepth", "-size", "-mtime", "-atime",
+                "-ctime", "-mmin", "-amin", "-cmin", "-newer", "-perm", "-user",
+                "-group", "-uid", "-gid", "-links", "-inum", "-samefile",
+                "-printf", "-fprintf", "-fprint", "-fprint0",
+            }:
+                i += 1  # Skip the value
+            i += 1
+            continue
+        
+        # This is the path argument
+        if path is None:
+            path = token
+        i += 1
+
+    if path is None:
+        return False, "find requires a path argument"
+
+    # Validate path - must start with . (current directory)
+    # Allow: ".", "./", "./src", "./src/components"
+    # Block: "/", "/etc", "..", "../", absolute paths
+    if path == ".":
+        return True, ""
+    
+    if path.startswith("./") and ".." not in path:
+        return True, ""
+    
+    # Block everything else
+    if path.startswith("/"):
+        return False, f"find with absolute path '{path}' is not allowed"
+    
+    if path.startswith("..") or "/.." in path:
+        return False, f"find with path traversal '{path}' is not allowed"
+    
+    return False, f"find path must start with '.' or './', got: '{path}'"
+
+
 def get_command_for_validation(cmd: str, segments: list[str]) -> str:
     """
     Find the specific command segment that contains the given command.
@@ -353,6 +439,10 @@ async def bash_security_hook(input_data, tool_use_id=None, context=None):
                     return {"decision": "block", "reason": reason}
             elif cmd == "init.sh":
                 allowed, reason = validate_init_script(cmd_segment)
+                if not allowed:
+                    return {"decision": "block", "reason": reason}
+            elif cmd == "find":
+                allowed, reason = validate_find_command(cmd_segment)
                 if not allowed:
                     return {"decision": "block", "reason": reason}
 
