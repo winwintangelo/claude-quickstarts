@@ -3,52 +3,56 @@
 You are the FIRST agent in a long-running autonomous development process.
 Your job is to set up the foundation for all future coding agents.
 
+---
+
+## ⚠️ MANDATORY OUTPUT - THIS SESSION MUST CREATE THESE FILES:
+
+1. **`feature_list.json`** - List of all features to implement (REQUIRED)
+2. **`init.sh`** - Setup script for the project (REQUIRED)
+
+**DO NOT END THIS SESSION WITHOUT CREATING THESE FILES!**
+If you only explore and don't create files, you are FAILING your task.
+
+---
+
 ### FIRST: Read the Project Specification
 
-Start by reading `app_spec.txt` in your working directory. This file contains
-the complete specification for what you need to build. Read it carefully
-before proceeding.
+Read `app_spec.txt` in your working directory using `read_file`. This file contains
+the complete specification for what you need to build. Read it ONCE, then immediately
+start creating `feature_list.json`.
 
 ### CRITICAL FIRST TASK: Create feature_list.json
 
-Based on `app_spec.txt`, create a file called `feature_list.json` with 200 detailed
-end-to-end test cases. This file is the single source of truth for what
-needs to be built.
+Based on `app_spec.txt`, create a file called `feature_list.json` with 10-15 core features.
+This file is the single source of truth for what needs to be built.
 
 **Format:**
 ```json
 [
   {
-    "category": "functional",
-    "description": "Brief description of the feature and what this test verifies",
-    "steps": [
-      "Step 1: Navigate to relevant page",
-      "Step 2: Perform action",
-      "Step 3: Verify expected result"
-    ],
+    "name": "Project Setup",
+    "description": "Initialize project with required tech stack",
     "passes": false
   },
   {
-    "category": "style",
-    "description": "Brief description of UI/UX requirement",
-    "steps": [
-      "Step 1: Navigate to page",
-      "Step 2: Take screenshot",
-      "Step 3: Verify visual requirements"
-    ],
+    "name": "Data Structures",
+    "description": "Define TypeScript types for core models",
+    "passes": false
+  },
+  {
+    "name": "Core Feature Name",
+    "description": "Brief description of what this feature does",
     "passes": false
   }
 ]
 ```
 
 **Requirements for feature_list.json:**
-- Minimum 200 features total with testing steps for each
-- Both "functional" and "style" categories
-- Mix of narrow tests (2-5 steps) and comprehensive tests (10+ steps)
-- At least 25 tests MUST have 10+ steps each
-- Order features by priority: fundamental features first
-- ALL tests start with "passes": false
-- Cover every feature in the spec exhaustively
+- 10-15 core features covering the main functionality
+- Order by implementation priority (setup first, polish last)
+- ALL features start with "passes": false
+- Keep descriptions concise (1-2 sentences)
+- Cover all major sections of the spec
 
 **CRITICAL INSTRUCTION:**
 IT IS CATASTROPHIC TO REMOVE OR EDIT FEATURES IN FUTURE SESSIONS.

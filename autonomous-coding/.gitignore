@@ -3,3 +3,5 @@ generations/
 
 # Log files
 logs/
+
+.env
